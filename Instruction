@@ -1,0 +1,18 @@
+*How to use
+  1) Create .lua file with grenade helper's code. https://raw.githubusercontent.com/MN1R/GrenadeHelper/main/GrenadeHelperCode
+  2) Download locations. https://raw.githubusercontent.com/MN1R/GrenadeHelper/main/Locations
+  3) Put them both to aimware folder
+  4) Load the grenade helper lua 
+  5) In config multibox select name of ur location config and press load button.
+  
+*How to create or own nades
+  1) Go to the nade recodrder group
+  2) Set ur crosshar to point, where u want to throw the nade
+  3) Select type of nade(standing, ducking, moving etc.)
+  4) Select time, which u will move, before throw
+  5) Press save nade button to test it
+  6) If u like it then u can save it in ur location config
+  7) If u don't like it then press remove nade button
+  
+*Have problems with nade helper
+  1) Add me to the discord friends: (Henderson Hasselback#0693)
