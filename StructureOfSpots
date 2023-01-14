@@ -1,0 +1,14 @@
+nade_indexes.MAP = 1                (string: 'de_mirage')
+nade_indexes.ABS = 2, 3, 4          (3 separate double: 22, 22.767, 22.312312)
+nade_indexes.VIEWANGLES = 5, 6, 7   (3 separate double: 22.423, 22.323423, 22)
+nade_indexes.NADE_TYPE = 8          (string: 'hegrenade', 'smokegrenade', 'molotov', 'flashbang', 'weapon')
+nade_indexes.SPOT_NAME = 9          (string: 'my_spot)
+nade_indexes.MOVE_TYPE = 10         (int: 
+                                          0 - standing
+                                          1 - duck
+                                          2 - moving
+                                          3 - jump throw
+                                          4 - move + jump throw
+                                          5 - half throw(right button)
+                                    )
+nade_indexes.TIME_TO_MOVE = 11      (float tick time(64 tickrate): 32.5)
