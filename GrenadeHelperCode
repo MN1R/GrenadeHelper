@@ -1,3 +1,4 @@
+--https://raw.githubusercontent.com/MN1R/GrenadeHelper/main/StructureOfSpots
 --region GUI
 local grenade_helper_tab = gui.Tab(gui.Reference("Misc"), "grenade_helper_tab", "Grenade Helper");
 
