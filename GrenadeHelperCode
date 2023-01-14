@@ -49,6 +49,10 @@ local location_array = {};
 
 --all constants will be here
 local constants = {};
+constants.TICKRATE = 64;
+
+local z_correction = 64;
+local z_correction_duck = 46;
 
 --local data
 local local_entity, local_abs, local_eye, local_viewangles, current_map, weapon_id, current_nade;
@@ -58,13 +62,12 @@ local real_time;
 --variables to help navigate into nades arrays
 local nade_indexes = {};
 nade_indexes.MAP = 1;
-nade_indexes.NADE_TYPE = 2;
-nade_indexes.NAME = 3;
-nade_indexes.TYPE = 4;
-nade_indexes.THROW_TYPE = 5;
-nade_indexes.TIME_TO_MOVE = 6;
-nade_indexes.ABS = 7;
-nade_indexes.VIEWANGLES = 10;
+nade_indexes.ABS = 2;
+nade_indexes.VIEWANGLES = 5;
+nade_indexes.NADE_TYPE = 8;
+nade_indexes.SPOT_NAME = 9;
+nade_indexes.MOVE_TYPE = 10;
+nade_indexes.TIME_TO_MOVE = 11;
 
 --variable, that help to navigate in ABS and VIEWANGLES
 local vector_indexes = {};
@@ -103,7 +106,7 @@ local function handleVariables()
             current_nade = "hegrenade"
         elseif weapon_id == 43 or weapon_id == 47 then
             current_nade = "flashbang"
-        elseif weapon_id == 45 then
+        elseif weapon_id == 45 then 
             current_nade = "smokegrenade"
         elseif weapon_id == 46 or weapon_id == 48 then
             current_nade = "molotov"
@@ -120,8 +123,7 @@ end
 --region NADE_RECORDER
 --gui
 nade_recorder_group_ui.name = gui.Editbox(nade_recorder_group, "name", "Nade Name");
-nade_recorder_group_ui.type = gui.Combobox(nade_recorder_group, "type", "Nade Type", "Standing", "Duck", "Move", "Jump Throw", "Move + Jump Throw");
-nade_recorder_group_ui.throw_type = gui.Combobox(nade_recorder_group, "throw_type", "Nade Throw Type", "Left Click", "Right Click");
+nade_recorder_group_ui.type = gui.Combobox(nade_recorder_group, "type", "Nade Type", "Standing", "Duck", "Move", "Jump Throw", "Move + Jump Throw", "Half Throw");
 nade_recorder_group_ui.time_to_move = gui.Slider(nade_recorder_group, "time_to_move", "Time to Move", 0.3, 0.3, 2, 0.01);
 
 --saving nade by current settings
@@ -130,14 +132,13 @@ nade_recorder_group_ui.save = gui.Button(nade_recorder_group, "Save Nade", funct
     --adding nade to locations
     location_array[#location_array + 1] = 
     {
-        current_map, 
-        current_nade,  
+        current_map,   
+        local_abs.x, local_abs.y, local_abs.z,
+        local_viewangles.x, local_viewangles.y, local_viewangles.z + (nade_recorder_group_ui.type:GetValue() == 1 and z_correction_duck or z_correction),
+        current_nade,
         nade_recorder_group_ui.name:GetValue(),
         nade_recorder_group_ui.type:GetValue(), 
-        nade_recorder_group_ui.throw_type:GetValue(),
-        nade_recorder_group_ui.time_to_move:GetValue(),
-        local_abs.x, local_abs.y, local_abs.z,
-        local_viewangles.x, local_viewangles.y, local_viewangles.z
+        nade_recorder_group_ui.time_to_move:GetValue() * constants.TICKRATE,
     }
 end)
 
@@ -148,7 +149,7 @@ nade_recorder_group_ui.remove = gui.Button(nade_recorder_group, "Remove Nade", f
     --removing last nade
     table.remove(location_array, #location_array)
 end)
-nade_recorder_group_ui.remove:SetPosY(216)
+nade_recorder_group_ui.remove:SetPosY(160)
 nade_recorder_group_ui.remove:SetPosX(130)
 --endregion
 
@@ -227,7 +228,7 @@ local function getCurrentSpot()
         --calculating distance to spot
         local distance = vector.Distance(
             local_abs.x, local_abs.y, local_abs.z, 
-            nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z]
+            nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)
         )
 
         --checking for distance
@@ -259,15 +260,15 @@ local function moveToClosestSpot(cmd)
     local nade_data = valid_spots_array[getClosestSpot()]
 
     --getting distance to spot 
-    local distance = vector.Distance(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z],  
-                                     local_abs.x, local_abs.y, local_abs.z)
+    local distance = vector.Distance(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
+                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction), local_abs.x, local_abs.y, local_abs.z)
 
     --checking that we are not on required pos
     if distance > constants.CURRENT_SPOT_MAX_DISTANCE then
             
         --substracting nade abs with our abs(way vector)
-        local way_vector = {vector.Subtract({nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z]},  
-                                            {local_abs.x, local_abs.y, local_abs.z})}
+        local way_vector = {vector.Subtract({nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
+                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)},  {local_abs.x, local_abs.y, local_abs.z})}
         
         --moving to the point
         cmd.forwardmove = (((math.cos(math.rad(local_viewangles.y)) * way_vector[1]) + (math.sin(math.rad(local_viewangles.y)) * way_vector[2])) * constants.MOVE_SPEED)
@@ -328,14 +329,14 @@ local function spotMovement(cmd)
     nade_data_cache = nade_data
 
     --checking for type of nade
-    local nade_type = nade_data[nade_indexes.TYPE]
+    local nade_type = nade_data[nade_indexes.MOVE_TYPE]
 
     --substracting nade abs with our abs(way vector)
     local way_vector = EulerAngles(0, local_viewangles.y - nade_data[nade_indexes.VIEWANGLES + vector_indexes.Y], 0):Forward()
 
     --CREATING MOVES
-    --standing
-    if nade_type == 0 then  
+    --standing or half throw
+    if nade_type == 0 or nade_type == 5 then  
 
         --finishing the movent cuz standing doesn't require anything
         movement_finshed = true
@@ -357,7 +358,7 @@ local function spotMovement(cmd)
     if nade_type == 2 then
 
         --checking for running time
-        if real_time - static_move_time < nade_data[nade_indexes.TIME_TO_MOVE] - constants.GRENADE_THROW_PRETIME and (aiming_finished or is_moving_now) then
+        if real_time - static_move_time < (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE)  - constants.GRENADE_THROW_PRETIME and (aiming_finished or is_moving_now) then
 
             --setting flag, that we are moving to don't check for current spot
             is_moving_now = true
@@ -368,7 +369,7 @@ local function spotMovement(cmd)
         end
 
         --predfinishing time, throwing the grenade
-        if real_time - static_move_time >= nade_data[nade_indexes.TIME_TO_MOVE] - constants.GRENADE_THROW_PRETIME and real_time - static_move_time < nade_data[nade_indexes.TIME_TO_MOVE] then
+        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) - constants.GRENADE_THROW_PRETIME and real_time - static_move_time < (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) then
 
             --moving to the point
             cmd.forwardmove = way_vector.x * constants.MAX_MOVE_SPEED
@@ -380,7 +381,7 @@ local function spotMovement(cmd)
         end
 
         --ending time, finishing the movement
-        if real_time - static_move_time >= nade_data[nade_indexes.TIME_TO_MOVE] then
+        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) then
 
             is_moving_now = false
         end
@@ -410,7 +411,7 @@ local function spotMovement(cmd)
     if nade_type == 4 then
 
         --checking for running time
-        if real_time - static_move_time < nade_data[nade_indexes.TIME_TO_MOVE] - constants.GRENADE_THROW_PRETIME and (aiming_finished or is_moving_now) then
+        if real_time - static_move_time < (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) - constants.GRENADE_THROW_PRETIME and (aiming_finished or is_moving_now) then
 
             --setting flag, that we are moving to don't check for current spot
             is_moving_now = true
@@ -421,7 +422,7 @@ local function spotMovement(cmd)
         end
 
         --predfinishing time, throwing the grenade
-        if real_time - static_move_time >= nade_data[nade_indexes.TIME_TO_MOVE] - constants.GRENADE_THROW_PRETIME and real_time - static_move_time < nade_data[nade_indexes.TIME_TO_MOVE] then
+        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) - constants.GRENADE_THROW_PRETIME and real_time - static_move_time < (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) then
 
             --jumping
             cmd.buttons = bit.bor(cmd.buttons, constants.IN_JUMP)
@@ -432,7 +433,7 @@ local function spotMovement(cmd)
         end
 
         --ending time, finishing the movement
-        if real_time - static_move_time >= nade_data[nade_indexes.TIME_TO_MOVE] then
+        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) then
 
             is_moving_now = false
         end
@@ -520,7 +521,7 @@ local function throwNade(cmd)
 
     --selecting throw type
     local nade_data = is_moving_now and nade_data_cache or valid_spots_array[getCurrentSpot()]
-    local throw_type = nade_data[nade_indexes.THROW_TYPE]
+    local throw_type = nade_data[nade_indexes.MOVE_TYPE] == 5 and 1 or 0;
     throw_buttons = (throw_type == 0) and constants.IN_ATTACK or constants.IN_ATTACK2
 
     --throwing the grenade
@@ -548,7 +549,7 @@ visuals_group_ui.text_color = gui.ColorPicker(visuals_group_ui.enable_spots_visu
 
 --aim point visuals
 visuals_group_ui.enable_aim_point_vizualization = gui.Checkbox(visuals_group, "enable_aim_point_vizualization", "Enable Aim Point Visualization", true);
-visuals_group_ui.aim_line_color = gui.ColorPicker(visuals_group_ui.enable_aim_point_vizualization, "aim_line_color", "", 180, 180, 180, 200);
+visuals_group_ui.aim_line_color = gui.ColorPicker(visuals_group_ui.enable_aim_point_vizualization, "aim_line_color", "", 180, 180, 180, 205);
 
 --font
 local font = draw.CreateFont("Bahnschrift SemiBold", 15);
@@ -597,12 +598,13 @@ local function createSpotsAnimation()
         --calculating distance to spot
         local distance = vector.Distance(
                                             local_abs.x, local_abs.y, local_abs.z, 
-                                            nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z]
+                                            nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
+                                                                                                                                            - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)
                                         )
 
         --getting text sizes
         draw.SetFont(font)
-        local nade_text = nade_emoji .. "  " .. nade_data[nade_indexes.NAME]
+        local nade_text = nade_emoji .. "  " .. nade_data[nade_indexes.SPOT_NAME]
         local nade_text_size = {draw.GetTextSize(nade_text)}
 
         --calculating size of box
@@ -670,7 +672,8 @@ local function drawSpotsPosition()
 
         --getting 2D pos of nade spot
         local nade_position_x, nade_position_y = client.WorldToScreen(
-            Vector3(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z])
+            Vector3(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
+                                                                                                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction))
         )   
 
         --getting current emoji 
@@ -695,7 +698,7 @@ local function drawSpotsPosition()
 
             --getting text
             draw.SetFont(font)
-            local nade_text = nade_emoji .. "  " .. nade_data[nade_indexes.NAME]
+            local nade_text = nade_emoji .. "  " .. nade_data[nade_indexes.SPOT_NAME]
             local nade_text_size = {draw.GetTextSize(nade_text)}
 
             --drawing background
@@ -743,8 +746,8 @@ local function drawNadeAimPoints()
     local z_vector = constants.DISTANCE_TO_AIM_POINT * math.sin(math.rad(-nade_data[nade_indexes.VIEWANGLES + vector_indexes.X]))
 
     --finding nade spot position 
-    local nade_pos = Vector3(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y],  nade_data[nade_indexes.ABS + vector_indexes.Z]) + 
-                     Vector3(local_eye.x, local_eye.y, nade_data[nade_indexes.TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)
+    local nade_pos = Vector3(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y],  nade_data[nade_indexes.ABS + vector_indexes.Z] - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)) + 
+                     Vector3(local_eye.x, local_eye.y, nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)
 
     --finding aim point pos 2D
     local aim_point_pos = {client.WorldToScreen(Vector3(nade_pos.x + x_vector, nade_pos.y + y_vector, nade_pos.z + z_vector))}
@@ -757,7 +760,7 @@ local function drawNadeAimPoints()
 
         --getting text size
         draw.SetFont(font)
-        local spot_name = "   " .. nade_data[nade_indexes.NAME]
+        local spot_name = "   " .. nade_data[nade_indexes.SPOT_NAME]
         local spot_text_size = {draw.GetTextSize(spot_name)}
 
         --background
@@ -927,8 +930,8 @@ local function getLocationConfigData()
         for nade_index, nade_data in pairs(location_data) do
 
             --adding settings 
-            --first 3 parametrs must be string
-            if nade_index <= 3 then
+            --this parametrs must be string
+            if nade_index == nade_indexes.MAP or nade_index == nade_indexes.SPOT_NAME or nade_index == nade_indexes.NADE_TYPE then
                 location_data_text = location_data_text .. "'" .. nade_data .. "', "
 
             --last element hasn't ", " and closing the "}"
