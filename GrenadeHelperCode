@@ -51,9 +51,8 @@ local location_array = {};
 --all constants will be here
 local constants = {};
 constants.TICKRATE = 64;
-
-local z_correction = 64;
-local z_correction_duck = 46;
+constants.EYE_STANDING = 64;
+constants.EYE_DUCKING = 46;
 
 --local data
 local local_entity, local_abs, local_eye, local_viewangles, current_map, weapon_id, current_nade;
@@ -134,13 +133,14 @@ nade_recorder_group_ui.save = gui.Button(nade_recorder_group, "Save Nade", funct
     location_array[#location_array + 1] = 
     {
         current_map,   
-        local_abs.x, local_abs.y, local_abs.z,
-        local_viewangles.x, local_viewangles.y, local_viewangles.z + (nade_recorder_group_ui.type:GetValue() == 1 and z_correction_duck or z_correction),
+        local_abs.x, local_abs.y, local_abs.z + (nade_recorder_group_ui.type:GetValue() == 1 and constants.EYE_DUCKING or constants.EYE_STANDING),
+        local_viewangles.x, local_viewangles.y, local_viewangles.z,
         current_nade,
         nade_recorder_group_ui.name:GetValue(),
         nade_recorder_group_ui.type:GetValue(), 
         nade_recorder_group_ui.time_to_move:GetValue() * constants.TICKRATE,
     }
+    print(nade_recorder_group_ui.type:GetValue())
 end)
 
 
@@ -204,6 +204,7 @@ local function getClosestSpot()
         --calculating distance to spot
         local distance = vector.Distance(local_abs.x, local_abs.y, local_abs.z, 
                                          nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z]
+                                                                                                                                         - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)
                                         )
 
         --finding closest
@@ -229,7 +230,7 @@ local function getCurrentSpot()
         --calculating distance to spot
         local distance = vector.Distance(
             local_abs.x, local_abs.y, local_abs.z, 
-            nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)
+            nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)
         )
 
         --checking for distance
@@ -262,14 +263,14 @@ local function moveToClosestSpot(cmd)
 
     --getting distance to spot 
     local distance = vector.Distance(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
-                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction), local_abs.x, local_abs.y, local_abs.z)
+                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING), local_abs.x, local_abs.y, local_abs.z)
 
     --checking that we are not on required pos
     if distance > constants.CURRENT_SPOT_MAX_DISTANCE then
             
         --substracting nade abs with our abs(way vector)
         local way_vector = {vector.Subtract({nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
-                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)},  {local_abs.x, local_abs.y, local_abs.z})}
+                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)},  {local_abs.x, local_abs.y, local_abs.z})}
         
         --moving to the point
         cmd.forwardmove = (((math.cos(math.rad(local_viewangles.y)) * way_vector[1]) + (math.sin(math.rad(local_viewangles.y)) * way_vector[2])) * constants.MOVE_SPEED)
@@ -561,6 +562,7 @@ constants.MOLOTOV_EMOJI = string.char(240, 159, 148, 165);
 constants.GRENADE_EMOJI = string.char(240, 159, 146, 165);
 constants.SMOKE_EMOJI = string.char(240, 159, 140, 171);
 constants.FLASHBANG_EMOJI = string.char(226, 156, 168);
+constants.WEAPON_EMOJI = string.char(240, 159, 148, 171);
 local nade_emoji = "";
 
 --animations
@@ -600,7 +602,7 @@ local function createSpotsAnimation()
         local distance = vector.Distance(
                                             local_abs.x, local_abs.y, local_abs.z, 
                                             nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
-                                                                                                                                            - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)
+                                                                                                                                            - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)
                                         )
 
         --getting text sizes
@@ -674,7 +676,7 @@ local function drawSpotsPosition()
         --getting 2D pos of nade spot
         local nade_position_x, nade_position_y = client.WorldToScreen(
             Vector3(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
-                                                                                                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction))
+                                                                                                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING))
         )   
 
         --getting current emoji 
@@ -687,6 +689,8 @@ local function drawSpotsPosition()
             nade_emoji = constants.MOLOTOV_EMOJI 
         elseif nade_type == "flashbang" then
             nade_emoji = constants.FLASHBANG_EMOJI     
+        elseif nade_type == "weapon" then
+            nade_emoji = constants.WEAPON_EMOJI
         end
 
         local nade_animations = animation_values_array[nade_index]
@@ -727,9 +731,6 @@ constants.AIMED_POINT_DISTANCE_LIMIT = 10;
 
 constants.DISTANCE_TO_AIM_POINT = 150;
 
-constants.EYE_STANDING = 64;
-constants.EYE_DUCKING = 46;
-
 --drawing aim points to nades
 local function drawNadeAimPoints()
 
@@ -747,7 +748,7 @@ local function drawNadeAimPoints()
     local z_vector = constants.DISTANCE_TO_AIM_POINT * math.sin(math.rad(-nade_data[nade_indexes.VIEWANGLES + vector_indexes.X]))
 
     --finding nade spot position 
-    local nade_pos = Vector3(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y],  nade_data[nade_indexes.ABS + vector_indexes.Z] - (nade_data[nade_indexes.MOVE_TYPE] == 1 and z_correction_duck or z_correction)) + 
+    local nade_pos = Vector3(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y],  nade_data[nade_indexes.ABS + vector_indexes.Z] - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)) + 
                      Vector3(local_eye.x, local_eye.y, nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)
 
     --finding aim point pos 2D
