@@ -15,11 +15,14 @@ local throw_group_ui =
 {
 };
 throw_group_ui.silent_aiming = gui.Checkbox(throw_group, "silent_aiming", "Silent Aiming", false);
-throw_group_ui.smooth_of_aiming = gui.Slider(throw_group, "smooth_of_aiming", "Smooth Of Aiming", 25, 1, 100, 1);
+throw_group_ui.smooth_of_aiming = gui.Slider(throw_group, "smooth_of_aiming", "Smooth Of Aiming", 5, 1, 100, 1);
+throw_group_ui.fov = gui.Slider(throw_group, "fov", "FOV", 90, 0, 360, 1);
+
+throw_group_ui.magnet_distance = gui.Slider(throw_group, "magnet_distance", "Distance of Magnet", 50, 0, 300);
 
 
 --visuals group
-local visuals_group = gui.Groupbox(grenade_helper_tab, "Visuals Group", 5, 300, 325, 450);
+local visuals_group = gui.Groupbox(grenade_helper_tab, "Visuals Group", 5, 350, 325, 450);
 
 local visuals_group_ui =
 {
@@ -53,6 +56,7 @@ local constants = {};
 constants.TICKRATE = 64;
 constants.EYE_STANDING = 64;
 constants.EYE_DUCKING = 46;
+constants.LEFT_BUTTON = 1;
 
 --local data
 local local_entity, local_abs, local_eye, local_viewangles, current_map, weapon_id, current_nade;
@@ -124,7 +128,7 @@ end
 --gui
 nade_recorder_group_ui.name = gui.Editbox(nade_recorder_group, "name", "Nade Name");
 nade_recorder_group_ui.type = gui.Combobox(nade_recorder_group, "type", "Nade Type", "Standing", "Duck", "Move", "Jump Throw", "Move + Jump Throw", "Half Throw");
-nade_recorder_group_ui.time_to_move = gui.Slider(nade_recorder_group, "time_to_move", "Time to Move", 0.3, 0.3, 2, 0.01);
+nade_recorder_group_ui.time_to_move = gui.Slider(nade_recorder_group, "time_to_move", "Time to Move", 0.35, 0.05, 1, 0.05);
 
 --saving nade by current settings
 nade_recorder_group_ui.save = gui.Button(nade_recorder_group, "Save Nade", function()
@@ -140,7 +144,6 @@ nade_recorder_group_ui.save = gui.Button(nade_recorder_group, "Save Nade", funct
         nade_recorder_group_ui.type:GetValue(), 
         nade_recorder_group_ui.time_to_move:GetValue() * constants.TICKRATE,
     }
-    print(nade_recorder_group_ui.type:GetValue())
 end)
 
 
@@ -163,6 +166,7 @@ nade_recorder_group_ui.remove:SetPosX(130)
 visuals_group_ui.distance_of_visibility = gui.Slider(visuals_group, "distance_of_visibility", "Distance Of Visibility", 500, 10, 2500, 5);
 
 
+local is_moving_now = false;
 local animation_values_array = {};
 local valid_spots_array = {};
 
@@ -221,6 +225,42 @@ end
 
 constants.CURRENT_SPOT_MAX_DISTANCE = 1;
 
+--it's so low to be maximaly accurate
+constants.MOVE_SPEED = 5;
+
+--moving us to current spot
+local function moveToClosestSpot(cmd)
+
+    --checking for closest spot
+    if not valid_spots_array[getClosestSpot()] then
+        return
+    end
+    
+    --getting data of closest nade
+    local nade_data = valid_spots_array[getClosestSpot()]
+
+    --getting distance to spot 
+    local distance = vector.Distance(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
+                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING), local_abs.x, local_abs.y, local_abs.z)
+
+    --checking for type of using
+    if input.IsButtonDown(constants.LEFT_BUTTON) and distance <= throw_group_ui.magnet_distance:GetValue() and not is_moving_now then
+
+        --checking that we are not on required pos
+        if distance > constants.CURRENT_SPOT_MAX_DISTANCE then
+                
+            --substracting nade abs with our abs(way vector)
+            local way_vector = {vector.Subtract({nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
+                                        - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)},  {local_abs.x, local_abs.y, local_abs.z})}
+            
+            --moving to the point
+            cmd.forwardmove = (((math.cos(math.rad(local_viewangles.y)) * way_vector[1]) + (math.sin(math.rad(local_viewangles.y)) * way_vector[2])) * constants.MOVE_SPEED)
+            cmd.sidemove = (((math.sin(math.rad(local_viewangles.y)) * way_vector[1]) + (math.cos(math.rad(local_viewangles.y)) * -way_vector[2])) * constants.MOVE_SPEED)
+        end
+    end
+end
+
+
 --getting current spot
 local function getCurrentSpot()
 
@@ -242,41 +282,6 @@ local function getCurrentSpot()
 
     return 0
 end
-
-
---key to move to closest spot
-throw_group_ui.move_to_closest_spot = gui.Keybox(throw_group, "move_to_closest_spot", "Move To Closest Spot", 5);
-
---it's so low to be maximaly accurate
-constants.MOVE_SPEED = 5;
-
---moving us to current spot
-local function moveToClosestSpot(cmd)
-
-    --checking for closest spot and for move to closest spot button
-    if not valid_spots_array[getClosestSpot()] or not (throw_group_ui.move_to_closest_spot:GetValue() ~= 0 and input.IsButtonDown(throw_group_ui.move_to_closest_spot:GetValue())) then
-        return
-    end
-
-    --getting data of closest nade
-    local nade_data = valid_spots_array[getClosestSpot()]
-
-    --getting distance to spot 
-    local distance = vector.Distance(nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
-                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING), local_abs.x, local_abs.y, local_abs.z)
-
-    --checking that we are not on required pos
-    if distance > constants.CURRENT_SPOT_MAX_DISTANCE then
-            
-        --substracting nade abs with our abs(way vector)
-        local way_vector = {vector.Subtract({nade_data[nade_indexes.ABS + vector_indexes.X], nade_data[nade_indexes.ABS + vector_indexes.Y], nade_data[nade_indexes.ABS + vector_indexes.Z] 
-                                    - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING)},  {local_abs.x, local_abs.y, local_abs.z})}
-        
-        --moving to the point
-        cmd.forwardmove = (((math.cos(math.rad(local_viewangles.y)) * way_vector[1]) + (math.sin(math.rad(local_viewangles.y)) * way_vector[2])) * constants.MOVE_SPEED)
-        cmd.sidemove = (((math.sin(math.rad(local_viewangles.y)) * way_vector[1]) + (math.cos(math.rad(local_viewangles.y)) * -way_vector[2])) * constants.MOVE_SPEED)
-    end
-end
 --endregion
 
 
@@ -284,10 +289,8 @@ end
 
 
 --region STAGES_CONTROLLERS
-local throwing_finished = false
 local movement_finshed = false;
 local aiming_finished = false;
-local is_moving_now = false;
 --endregion
 
 
@@ -298,7 +301,8 @@ local is_moving_now = false;
 local nade_data_cache = {};
 local static_move_time = 0;
 
-constants.GRENADE_THROW_PRETIME = 0.225;
+constants.GRENADE_THROW_PRETIME = 0.03;
+constants.IS_MOVING_DELAY = 0.35;
 constants.MAX_MOVE_SPEED = 450;
 constants.MAX_DISTANCE_TO_AIM_POINT = 150;
 constants.IN_JUMP = bit.lshift(1, 1);
@@ -322,6 +326,8 @@ local function spotMovement(cmd)
 
         return 
     end
+
+    local sendpacket = cmd.sendpacket
 
     --disabling auto +w on grenade
     gui.SetValue("misc.strafe.disablenade", true)
@@ -347,7 +353,9 @@ local function spotMovement(cmd)
     --ducking
     if nade_type == 1 then
 
-        cmd.buttons = bit.bor(cmd.buttons, constants.IN_DUCK)
+        if sendpacket then
+            cmd.buttons = bit.bor(cmd.buttons, constants.IN_DUCK)
+        end
 
         --checking, for nade is not throw
         if aiming_finished then
@@ -383,7 +391,7 @@ local function spotMovement(cmd)
         end
 
         --ending time, finishing the movement
-        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) then
+        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) + constants.IS_MOVING_DELAY then
 
             is_moving_now = false
         end
@@ -398,8 +406,10 @@ local function spotMovement(cmd)
             is_moving_now = true
 
             --jumping and finishing the movement
-            cmd.buttons = bit.bor(cmd.buttons, constants.IN_JUMP)
-            movement_finshed = true
+            if sendpacket then
+                cmd.buttons = bit.bor(cmd.buttons, constants.IN_JUMP)
+                movement_finshed = true
+            end
 
             --reseting with some delay to save viewangles
             if real_time - static_move_time >= constants.GRENADE_THROW_PRETIME then
@@ -427,15 +437,17 @@ local function spotMovement(cmd)
         if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) - constants.GRENADE_THROW_PRETIME and real_time - static_move_time < (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) then
 
             --jumping
-            cmd.buttons = bit.bor(cmd.buttons, constants.IN_JUMP)
+            if sendpacket then
+                cmd.buttons = bit.bor(cmd.buttons, constants.IN_JUMP)
 
-            --throwing
-            movement_finshed = true
-            aiming_finished = true
+                --throwing
+                movement_finshed = true
+                aiming_finished = true
+            end
         end
 
         --ending time, finishing the movement
-        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE) then
+        if real_time - static_move_time >= (nade_data[nade_indexes.TIME_TO_MOVE] / constants.TICKRATE)  + constants.IS_MOVING_DELAY then
 
             is_moving_now = false
         end
@@ -448,9 +460,6 @@ end
 
 
 --region THROW_NADE
---gui
-throw_group_ui.auto_throw = gui.Keybox(throw_group, "auto_throw", "Auto Throw", 81);
-
 --making smooth aiming
 local angle_x, angle_y, angle_z = 0, 0, 0;
 constants.MAX_INACCURACY = 0.02;
@@ -459,7 +468,7 @@ constants.MAX_INACCURACY = 0.02;
 local function aimOnNade(cmd)
 
     --checking, that we are on spot or that our movement is finished
-    if not is_moving_now and (not valid_spots_array[getCurrentSpot()] or not (throw_group_ui.auto_throw:GetValue() ~= 0 and input.IsButtonDown(throw_group_ui.auto_throw:GetValue()))) then
+    if not is_moving_now and not (valid_spots_array[getCurrentSpot()] and input.IsButtonDown(constants.LEFT_BUTTON)) then
 
         --reseting old angles, to aim from last position of crosshair
         if local_viewangles then
@@ -480,6 +489,13 @@ local function aimOnNade(cmd)
     local viewangles_x = nade_data[nade_indexes.VIEWANGLES + vector_indexes.X]
     local viewangles_y = nade_data[nade_indexes.VIEWANGLES + vector_indexes.Y]
     local viewangles_z = nade_data[nade_indexes.VIEWANGLES + vector_indexes.Z]
+
+    --distance check
+    local distance = vector.Distance(local_viewangles.x, local_viewangles.y, local_viewangles.z, viewangles_x, viewangles_y, viewangles_z)
+    --print(distance)
+    if distance >= throw_group_ui.fov:GetValue() then
+        return
+    end
 
     --smooth animation for viewangles
     angle_x = angle_x + (viewangles_x - angle_x) / throw_group_ui.smooth_of_aiming:GetValue()
@@ -502,21 +518,19 @@ local function aimOnNade(cmd)
 end
 
 
+--throwing nade
 local throw_buttons = 0;
 local attack_activated = false;
 
 constants.IN_ATTACK = bit.lshift(1, 0)
 constants.IN_ATTACK2 = bit.lshift(1, 11)
 
---throwing nade
 local function throwNade(cmd)
 
     --checking, that all stages are done
     if not movement_finshed or not aiming_finished then
 
-        --reseting flag
-        throwing_finished = false
-        attack_activated = false
+        local attack_activated = false;
 
         return
     end
@@ -526,14 +540,13 @@ local function throwNade(cmd)
     local throw_type = nade_data[nade_indexes.MOVE_TYPE] == 5 and 1 or 0;
     throw_buttons = (throw_type == 0) and constants.IN_ATTACK or constants.IN_ATTACK2
 
-    --throwing the grenade
-    if not attack_activated then
-
+    if cmd.sendpacket and not attack_activated then
         cmd.buttons = bit.bor(cmd.buttons, throw_buttons)
         attack_activated = true
-
-        throwing_finished = true
-    end 
+    elseif cmd.sendpacket and attack_activated then
+        cmd.buttons = not cmd.buttons
+        attack_activated = false
+    end
 end
 --endregion
 
