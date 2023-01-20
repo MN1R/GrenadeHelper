@@ -353,14 +353,15 @@ local function spotMovement(cmd)
     --ducking
     if nade_type == 1 then
 
-        if sendpacket then
-            cmd.buttons = bit.bor(cmd.buttons, constants.IN_DUCK)
-        end
-
         --checking, for nade is not throw
-        if aiming_finished then
+        if sendpacket then
+            
+            cmd.buttons = bit.bor(cmd.buttons, constants.IN_DUCK)
 
-            movement_finshed = true
+            if aiming_finished then
+
+                movement_finshed = true
+            end
         end
     end
     
@@ -470,6 +471,10 @@ local function aimOnNade(cmd)
     --checking, that we are on spot or that our movement is finished
     if not is_moving_now and not (valid_spots_array[getCurrentSpot()] and input.IsButtonDown(constants.LEFT_BUTTON)) then
 
+        --reseting flag for anti-aims on grenade
+        gui.SetValue("lbot.antiaim.ongrenade", false)
+        gui.SetValue("rbot.antiaim.condition.grenade", false)
+
         --reseting old angles, to aim from last position of crosshair
         if local_viewangles then
             
@@ -497,6 +502,10 @@ local function aimOnNade(cmd)
         return
     end
 
+    --disabling anti-aims on grenade
+    gui.SetValue("lbot.antiaim.ongrenade", true)
+    gui.SetValue("rbot.antiaim.condition.grenade", true)
+
     --smooth animation for viewangles
     angle_x = angle_x + (viewangles_x - angle_x) / throw_group_ui.smooth_of_aiming:GetValue()
     angle_y = angle_y + (viewangles_y - angle_y) / throw_group_ui.smooth_of_aiming:GetValue()
@@ -504,9 +513,10 @@ local function aimOnNade(cmd)
     
     --installing angles for viewmodel and for model by type of aiming
     if throw_group_ui.silent_aiming:GetValue() then
-        cmd:SetViewAngles(EulerAngles(angle_x, angle_y, angle_z))
+        cmd.viewangles = EulerAngles(angle_x, angle_y, angle_z)
     else
         engine.SetViewAngles(EulerAngles(angle_x, angle_y, angle_z))
+        cmd.viewangles = EulerAngles(angle_x, angle_y, angle_z)
     end
 
     --checking by viewangles, that we are aimed on point
