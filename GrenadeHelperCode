@@ -18,11 +18,12 @@ throw_group_ui.silent_aiming = gui.Checkbox(throw_group, "silent_aiming", "Silen
 throw_group_ui.smooth_of_aiming = gui.Slider(throw_group, "smooth_of_aiming", "Smooth Of Aiming", 5, 1, 100, 1);
 throw_group_ui.fov = gui.Slider(throw_group, "fov", "FOV", 90, 0, 360, 1);
 
+throw_group_ui.magnet_key = gui.Keybox(throw_group, "magnet_key", "Magnet Key", 1);
 throw_group_ui.magnet_distance = gui.Slider(throw_group, "magnet_distance", "Distance of Magnet", 50, 0, 300);
 
 
 --visuals group
-local visuals_group = gui.Groupbox(grenade_helper_tab, "Visuals Group", 5, 350, 325, 450);
+local visuals_group = gui.Groupbox(grenade_helper_tab, "Visuals Group", 5, 370, 325, 450);
 
 local visuals_group_ui =
 {
@@ -56,12 +57,12 @@ local constants = {};
 constants.TICKRATE = 64;
 constants.EYE_STANDING = 64;
 constants.EYE_DUCKING = 46;
-constants.LEFT_BUTTON = 1;
 
 --local data
 local local_entity, local_abs, local_eye, local_viewangles, current_map, weapon_id, current_nade;
 local screen_width, screen_height;
 local real_time;
+local magnet_activated = false;
 
 --variables to help navigate into nades arrays
 local nade_indexes = {};
@@ -86,6 +87,9 @@ local function handleVariables()
 
     --getting screen size
     screen_width, screen_height = draw.GetScreenSize();
+
+    --checking for magnet 
+    magnet_activated = throw_group_ui.magnet_key:GetValue() ~= 0 and input.IsButtonDown(throw_group_ui.magnet_key:GetValue());
 
     --getting local entity
     local_entity = entities.GetLocalPlayer()
@@ -244,7 +248,7 @@ local function moveToClosestSpot(cmd)
                                     - (nade_data[nade_indexes.MOVE_TYPE] == 1 and constants.EYE_DUCKING or constants.EYE_STANDING), local_abs.x, local_abs.y, local_abs.z)
 
     --checking for type of using
-    if input.IsButtonDown(constants.LEFT_BUTTON) and distance <= throw_group_ui.magnet_distance:GetValue() and not is_moving_now then
+    if magnet_activated and distance <= throw_group_ui.magnet_distance:GetValue() and not is_moving_now then
 
         --checking that we are not on required pos
         if distance > constants.CURRENT_SPOT_MAX_DISTANCE then
@@ -330,7 +334,7 @@ local function spotMovement(cmd)
     local sendpacket = cmd.sendpacket
 
     --disabling auto +w on grenade
-    gui.SetValue("misc.strafe.disablenade", true)
+    --gui.SetValue("misc.strafe.disablenade", true)
 
     --getting current nade data and creating cache, to checking it, when will move out from spot
     local nade_data = is_moving_now and nade_data_cache or valid_spots_array[getCurrentSpot()]
@@ -469,7 +473,7 @@ constants.MAX_INACCURACY = 0.02;
 local function aimOnNade(cmd)
 
     --checking, that we are on spot or that our movement is finished
-    if not is_moving_now and not (valid_spots_array[getCurrentSpot()] and input.IsButtonDown(constants.LEFT_BUTTON)) then
+    if not is_moving_now and not (valid_spots_array[getCurrentSpot()] and magnet_activated) then
 
         --reseting flag for anti-aims on grenade
         gui.SetValue("lbot.antiaim.ongrenade", false)
